@@ -1,0 +1,38 @@
+import os
+import boto3
+import json
+
+ENDPOINT_NAME = os.environ['ENDPOINT_NAME']
+runtime = boto3.client('sagemaker-runtime')
+
+def lambda_handler(event, context):
+    print("Received event: " + json.dumps(event, indent=2))
+    
+    payload = event["data"]  # Must be CSV string
+    print("Payload:", payload)
+    
+    response = runtime.invoke_endpoint(
+        EndpointName=ENDPOINT_NAME,
+        ContentType='text/csv',
+        Body=payload
+    )
+
+    result = response['Body'].read().decode('utf-8')
+    print("Raw model response:", result)
+
+    try:
+        prediction = json.loads(result)
+        prob = float(prediction['predictions'][0][0])  # Access nested float
+
+        decision = "Approved" if prob > 0.46 else "Rejected"
+
+        return {
+            "probability": prob,
+            "decision": decision
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e),
+            "raw_response": result
+        }
